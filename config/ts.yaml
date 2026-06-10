@@ -1,0 +1,9 @@
+# TS (业务测试服务器) 部署配置
+role: ts
+
+interfaces:
+  - name: ens37           # 数据面, 和 AP 共用 (连交换机 #2)
+    mac: "00:1a:2b:3c:4d:02"
+
+aid: "d3c29a3a629280e686cf8d969eef6eca"
+rid: [10003, 36193]

@@ -1,0 +1,16 @@
+# AP-2 (接入设备) 部署配置
+role: ap
+
+interfaces:
+  - name: ens37          # 数据面, 和 TS+AP-1 共用 (连交换机 #2)
+    mac: "00:05:DC:12:33:28"
+
+aid: "280e686cf8d969eef6ecad3c29a3a629"     # AP-2 的 AID
+rid: [10002, 36192]                          # AP-2 的 RID
+cs_rid: [10028, 36181]                       # CS 的 RID
+cs_mac: "00:1A:2B:3C:4D:01"                 # CS 的 MAC (ens34)
+cr_rid: [12360, 34280]                       # 关联 CR-2 的 RID
+cr_mac: "00:18:54:FD:29:02"                 # CR-2 的接入 MAC
+
+local_users:
+  - { aid: "969eef6ecad3c29a3a629280e686cf8d", ip: "192.168.2.100", mac: "00:11:22:33:44:02" }

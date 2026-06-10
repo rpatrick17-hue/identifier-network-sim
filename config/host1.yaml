@@ -1,0 +1,13 @@
+# Host-1 (用户终端) 部署配置
+role: host
+
+interfaces:
+  - name: wlan0           # 无线/有线网卡名 (连 AP-1)
+    mac: "00:11:22:33:44:01"
+
+aid: "cad3c29a3a629280e686cf8d969eef6e"
+username: "Zhangsan"
+password: "123"
+ip: "192.168.1.100"
+ap_mac: "00:04:ab:1f:40:a6"       # AP-1 的 MAC
+target_aid: "d3c29a3a629280e686cf8d969eef6eca"  # TS 的 AID (发 HTTP 请求的目标)
