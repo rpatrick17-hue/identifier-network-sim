@@ -1,0 +1,16 @@
+# AP-1 (接入设备) 部署配置
+role: ap
+
+interfaces:
+  - name: ens37          # 接入网卡名 (连接入交换机1)
+    mac: "00:04:ab:1f:40:a6"
+
+aid: "8d969eef6ecad3c29a3a629280e686cf"     # AP 自己的 AID
+rid: [10001, 36191]                          # AP 自己的 RID
+cs_rid: [10028, 36181]                       # CS 的 RID
+cs_mac: "00:1a:2b:3c:4d:01"                 # CS 的 MAC
+cr_rid: [10001, 36191]                       # 关联 CR 的 RID
+cr_mac: "00:18:54:fd:29:01"                 # 关联 CR 的接入 MAC
+
+local_users:
+  - { aid: "cad3c29a3a629280e686cf8d969eef6e", ip: "192.168.1.100", mac: "00:11:22:33:44:01" }

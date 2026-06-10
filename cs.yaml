@@ -1,0 +1,27 @@
+# CS (控制平面服务器) 部署配置
+role: cs
+
+interfaces:
+  - name: ens34           # 管理网卡, 独享 (连交换机 #1)
+    mac: "00:1a:2b:3c:4d:01"
+
+cs_rid: [10028, 36181]    # CS 自己的 RID (管理空间内)
+
+# 预注册用户列表
+users:
+  - { username: "Zhangsan", password: "123",  pin: "1234", attributes: "UR:3;BW:10Mbps" }
+  - { username: "Lisi",     password: "Abc",  pin: "0000", attributes: "UR:2;BW:5Mbps" }
+
+# 管理的 CR 列表 (RID → 名称)
+managed_crs:
+  - [10001, 36191]    # CR-1
+  - [12360, 34280]    # CR-2
+  - [10030, 36190]    # CR-3
+  - [12365, 34282]    # CR-4
+  - [3540,  12768]    # CR-5
+  - [3545,  12770]    # CR-6
+
+# AP → CR 映射 (哪个 AP 属于哪个 CR)
+ap_to_cr:
+  - [[10001, 36191], [10001, 36191]]   # AP-1 → CR-1
+  - [[10002, 36192], [12360, 34280]]   # AP-2 → CR-2

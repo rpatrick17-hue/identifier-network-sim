@@ -1,0 +1,217 @@
+# ============================================================================
+#  Identifier Network Simulation — Topology Configuration
+# ============================================================================
+#  Physical topology (document Fig.8):
+#    6 CRs mesh-connected in the core
+#    2+ APs connected to CRs via access switches (port-isolated)
+#    1 CS on the management switch
+#    1 Test Server on the data switch
+#    2 Hosts connected to APs
+# ============================================================================
+
+switches:
+  mgmt-switch:
+    description: "Management-plane switch (CS ↔ CRs control traffic)"
+    isolation_groups: []   # no isolation – all ports can communicate
+
+  data-switch:
+    description: "Data-plane switch with port isolation for AP-CR pairs"
+    isolation_groups:
+      - { id: 1, ports: [1, 2] }    # CR1 ↔ AP1
+      - { id: 2, ports: [3, 4] }    # CR2 ↔ AP2
+      - { id: 3, ports: [5, 6] }    # Test Server ↔ CR1 (shared access)
+
+nodes:
+  # =========================================================================
+  #  Core Routers (6x)
+  # =========================================================================
+  core_routers:
+    # --- CR-1 ---
+    - name: CR-1
+      rid: [10001, 36191]
+      interfaces:
+        - { name: Eth0, mac: "00:18:54:FD:29:01", type: ACCESS }
+        - { name: Eth1, mac: "00:0C:AB:1E:76:8A", type: ROUTE }
+        - { name: Eth2, mac: "00:0C:AB:1E:76:8B", type: ROUTE }
+      rid_spaces:
+        - { id: 0,   x: 10028, y: 36181, x_mask: 20, y_mask: 20, policy: MANAGEMENT }
+        - { id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, policy: DEFAULT }
+        - { id: 204, x: 3523,  y: 12578, x_mask: 30, y_mask: 28, policy: ADVANCED }
+      rid_routes:
+        - { space_id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, next_hop: [12360, 34280] }
+        - { space_id: 201, x: 3523,  y: 12578, x_mask: 30, y_mask: 28, next_hop: [3540, 12768] }
+      aid_routes:
+        - { dst_aid: "cad3c29a3a629280e686cf8d969eef6e", next_hop: "8d969eef6ecad3c29a3a629280e686cf" }
+        - { dst_aid: "969eef6ecad3c29a3a629280e686cf8d", next_hop: "8d969eef6ecad3c29a3a629280e686cf" }
+      associated_aps:
+        - { aid: "8d969eef6ecad3c29a3a629280e686cf", rid: [10001, 36191], interface: 0 }
+        - { aid: "280e686cf8d969eef6ecad3c29a3a629", rid: [10002, 36192], interface: 0 }
+      local_mappings:
+        - { aid: "cad3c29a3a629280e686cf8d969eef6e", rid: [10028, 36181], space_id: 0 }
+        - { aid: "969eef6ecad3c29a3a629280e686cf8d", rid: [12345, 34267], space_id: 100 }
+      users:
+        - { aid: "cad3c29a3a629280e686cf8d969eef6e", ap_aid: "8d969eef6ecad3c29a3a629280e686cf", status: ONLINE }
+
+    # --- CR-2 ---
+    - name: CR-2
+      rid: [12360, 34280]
+      interfaces:
+        - { name: Eth0, mac: "00:18:54:FD:29:02", type: ACCESS }
+        - { name: Eth1, mac: "00:0C:AB:1E:76:8C", type: ROUTE }
+        - { name: Eth2, mac: "00:0C:AB:1E:76:8D", type: ROUTE }
+      rid_spaces:
+        - { id: 0,   x: 10028, y: 36181, x_mask: 20, y_mask: 20, policy: MANAGEMENT }
+        - { id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, policy: DEFAULT }
+      rid_routes:
+        - { space_id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, next_hop: [10001, 36191] }
+      local_mappings:
+        - { aid: "969eef6ecad3c29a3a629280e686cf8d", rid: [12360, 34280], space_id: 100 }
+      users:
+        - { aid: "969eef6ecad3c29a3a629280e686cf8d", ap_aid: "280e686cf8d969eef6ecad3c29a3a629", status: ONLINE }
+
+    # --- CR-3 ---
+    - name: CR-3
+      rid: [10030, 36190]
+      interfaces:
+        - { name: Eth0, mac: "00:18:54:FD:29:03", type: ACCESS }
+        - { name: Eth1, mac: "00:0C:AB:1E:76:8E", type: ROUTE }
+      rid_spaces:
+        - { id: 0,   x: 10028, y: 36181, x_mask: 20, y_mask: 20, policy: MANAGEMENT }
+        - { id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, policy: DEFAULT }
+      rid_routes:
+        - { space_id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, next_hop: [12360, 34280] }
+
+    # --- CR-4 ---
+    - name: CR-4
+      rid: [12365, 34282]
+      interfaces:
+        - { name: Eth0, mac: "00:18:54:FD:29:04", type: ACCESS }
+        - { name: Eth1, mac: "00:0C:AB:1E:76:8F", type: ROUTE }
+      rid_spaces:
+        - { id: 0,   x: 10028, y: 36181, x_mask: 20, y_mask: 20, policy: MANAGEMENT }
+        - { id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, policy: DEFAULT }
+      rid_routes:
+        - { space_id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, next_hop: [12360, 34280] }
+
+    # --- CR-5 ---
+    - name: CR-5
+      rid: [3540, 12768]
+      interfaces:
+        - { name: Eth0, mac: "00:18:54:FD:29:05", type: ACCESS }
+        - { name: Eth1, mac: "00:0C:AB:1E:76:90", type: ROUTE }
+      rid_spaces:
+        - { id: 0,   x: 10028, y: 36181, x_mask: 20, y_mask: 20, policy: MANAGEMENT }
+        - { id: 201, x: 3523,  y: 12578, x_mask: 30, y_mask: 28, policy: ADVANCED }
+      rid_routes:
+        - { space_id: 201, x: 3523, y: 12578, x_mask: 30, y_mask: 28, next_hop: [3523, 12578] }
+
+    # --- CR-6 ---
+    - name: CR-6
+      rid: [3545, 12770]
+      interfaces:
+        - { name: Eth0, mac: "00:18:54:FD:29:06", type: ACCESS }
+        - { name: Eth1, mac: "00:0C:AB:1E:76:91", type: ROUTE }
+      rid_spaces:
+        - { id: 0,   x: 10028, y: 36181, x_mask: 20, y_mask: 20, policy: MANAGEMENT }
+        - { id: 201, x: 3523,  y: 12578, x_mask: 30, y_mask: 28, policy: ADVANCED }
+      rid_routes:
+        - { space_id: 201, x: 3523, y: 12578, x_mask: 30, y_mask: 28, next_hop: [3523, 12578] }
+
+  # =========================================================================
+  #  Control Server (1x)
+  # =========================================================================
+  control_server:
+    name: CS
+    rid: [10028, 36181]
+    interfaces:
+      - { name: Eth0, mac: "00:1A:2B:3C:4D:01", type: ROUTE }
+    pre_registered_users:
+      - { username: "Zhangsan", password: "123",  pin: "1234", attributes: "UR:3;BW:10Mbps" }
+      - { username: "Lisi",     password: "Abc",  pin: "0000", attributes: "UR:2;BW:5Mbps" }
+
+  # =========================================================================
+  #  Access Points (2x)
+  # =========================================================================
+  access_points:
+    - name: AP-1
+      aid: "8d969eef6ecad3c29a3a629280e686cf"
+      rid: [10001, 36191]
+      cs_rid: [10028, 36181]
+      cr_rid: [10001, 36191]
+      ssid: "ID-Network-1"
+      frequency: "2.4GHz"
+      ip_subnet: "192.168.1.0/24"
+      access_iface: 0
+      cr_iface: 0
+      interfaces:
+        - { name: Wlan0, mac: "00:04:AB:1F:40:A6", type: ACCESS }
+
+    - name: AP-2
+      aid: "280e686cf8d969eef6ecad3c29a3a629"
+      rid: [10002, 36192]
+      cs_rid: [10028, 36181]
+      cr_rid: [12360, 34280]
+      ssid: "ID-Network-2"
+      frequency: "5GHz"
+      ip_subnet: "192.168.2.0/24"
+      access_iface: 0
+      cr_iface: 0
+      interfaces:
+        - { name: Wlan0, mac: "00:05:DC:12:33:28", type: ACCESS }
+
+  # =========================================================================
+  #  Test Server (1x)
+  # =========================================================================
+  test_server:
+    name: TS
+    aid: "d3c29a3a629280e686cf8d969eef6eca"
+    rid: [10003, 36193]
+    interfaces:
+      - { name: Eth0, mac: "00:1A:2B:3C:4D:02", type: ACCESS }
+
+  # =========================================================================
+  #  Hosts (2x)
+  # =========================================================================
+  hosts:
+    - name: Host-1
+      ip: "192.168.1.100"
+      netmask: "255.255.255.0"
+      gateway: "192.168.1.1"
+      ap_mac: "00:04:AB:1F:40:A6"
+      aid: "cad3c29a3a629280e686cf8d969eef6e"
+      username: "Zhangsan"
+      password: "123"
+      interfaces:
+        - { name: Wlan0, mac: "00:11:22:33:44:01", type: ACCESS }
+
+    - name: Host-2
+      ip: "192.168.2.100"
+      netmask: "255.255.255.0"
+      gateway: "192.168.2.1"
+      ap_mac: "00:05:DC:12:33:28"
+      aid: "969eef6ecad3c29a3a629280e686cf8d"
+      username: "Lisi"
+      password: "Abc"
+      interfaces:
+        - { name: Wlan0, mac: "00:11:22:33:44:02", type: ACCESS }
+
+# ============================================================================
+#  Connections: node-interface → switch-port
+# ============================================================================
+connections:
+  # Management switch: CS ↔ all CRs
+  - { node: CS,    interface: 0, switch: mgmt-switch, port: 1 }
+  - { node: CR-1,  interface: 1, switch: mgmt-switch, port: 2 }
+  - { node: CR-2,  interface: 1, switch: mgmt-switch, port: 3 }
+  - { node: CR-3,  interface: 1, switch: mgmt-switch, port: 4 }
+  - { node: CR-4,  interface: 1, switch: mgmt-switch, port: 5 }
+  - { node: CR-5,  interface: 1, switch: mgmt-switch, port: 6 }
+  - { node: CR-6,  interface: 1, switch: mgmt-switch, port: 7 }
+
+  # Data switch: CR1↔AP1 (port iso group 1), CR2↔AP2 (group 2)
+  - { node: CR-1,  interface: 0, switch: data-switch, port: 1 }
+  - { node: AP-1,  interface: 0, switch: data-switch, port: 2 }
+  - { node: CR-2,  interface: 0, switch: data-switch, port: 3 }
+  - { node: AP-2,  interface: 0, switch: data-switch, port: 4 }
+  - { node: TS,    interface: 0, switch: data-switch, port: 5 }
+  - { node: CR-1,  interface: 1, switch: data-switch, port: 6 }  # TS shares data plane with CR-1
