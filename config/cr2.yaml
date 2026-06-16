@@ -1,0 +1,57 @@
+# CR-2 (核心路由器) 部署配置
+# 接口: 管理口(ens34) + 核心口(ens37.10, VLAN 10) + 接入口(ens37.30, VLAN 30)
+role: cr
+name: CR-2
+
+rid: [12360, 34280]           # CR-2 自己的 RID
+
+interfaces:
+  - name: ens34               # 管理口 — 交换机#1 VLAN1
+    mac: "00:18:54:fd:29:02"
+    type: ROUTE
+  - name: ens37.10            # 核心口 — 交换机#2 VLAN10 (核心面)
+    mac: "00:0c:ab:1e:76:8c"
+    type: ROUTE
+  - name: ens37.30            # 接入口 — 交换机#2 VLAN30 (接入面2)
+    mac: "00:0c:ab:1e:76:8d"
+    type: ACCESS
+
+# RID 空间表 (Table 2)
+rid_spaces:
+  - { id: 0,   x: 10028, y: 36181, x_mask: 20, y_mask: 20, policy: MANAGEMENT }
+  - { id: 100, x: 12345, y: 34267, x_mask: 20, y_mask: 24, policy: DEFAULT }
+
+# 路由空间邻居 (Table 3, 核心侧)
+route_neighbors:
+  - { space_id: 0,   rid: [10028, 36181], mac: "00:1a:2b:3c:4d:01", interface: 0 }   # CS
+  - { space_id: 100, rid: [10001, 36191], mac: "00:0c:ab:1e:76:8a", interface: 1 }   # CR-1 核心口
+
+# 接入空间邻居 (Table 4)
+access_neighbors:
+  - { aid: "280e686cf8d969eef6ecad3c29a3a629", mac: "00:05:dc:12:33:28", interface: 2 }   # AP-2
+  - { aid: "969eef6ecad3c29a3a629280e686cf8d", mac: "00:11:22:33:44:02", interface: 2 }   # Host-2
+
+# RID 路由表 (Table 5)
+rid_routes:
+  - { space_id: 100, x: 10001, y: 36191, x_mask: 20, y_mask: 20, next_hop: [10001, 36191] }
+
+# AID 路由表 (Table 6)
+aid_routes:
+  - { dst_aid: "969eef6ecad3c29a3a629280e686cf8d", next_hop: "280e686cf8d969eef6ecad3c29a3a629" }
+
+# 本地映射表 (Table 7)
+local_mappings:
+  - { aid: "280e686cf8d969eef6ecad3c29a3a629", rid: [10002, 36192], space_id: 0 }      # AP-2
+  - { aid: "969eef6ecad3c29a3a629280e686cf8d", rid: [10002, 36192], space_id: 100 }    # Host-2
+
+# 远端映射表 (Table 8) — CR-1 侧的设备
+remote_mappings:
+  - { aid: "cad3c29a3a629280e686cf8d969eef6e", mapped_rid: [10001, 36191], remote_cr: [10001, 36191], space_id: 100 }  # Host-1
+  - { aid: "d3c29a3a629280e686cf8d969eef6eca", mapped_rid: [10003, 36193], remote_cr: [10001, 36191], space_id: 100 }  # TS
+
+# 关联 AP 列表
+associated_aps:
+  - { aid: "280e686cf8d969eef6ecad3c29a3a629", rid: [10002, 36192], interface: 2 }
+
+# 用户状态列表 — 初始为空
+users: []

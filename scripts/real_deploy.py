@@ -3,15 +3,17 @@
 标识网络模态 — 真机部署入口
 
 每台北交大设备运行此脚本, 绑定真实物理网卡, 通过 AF_PACKET 收发
-标识网络帧 (AID/RID)。中兴 CR 由硬件原生支持, 不在此部署范围内。
+标识网络帧 (AID/RID)。CR 由 Python CoreRouter 实现标识模态转发。
 
 用法:
-    sudo python3 scripts/real_deploy.py --role cs   --config config/cs.yaml
-    sudo python3 scripts/real_deploy.py --role ap   --config config/ap1.yaml
-    sudo python3 scripts/real_deploy.py --role ts   --config config/ts.yaml
+    sudo python3 scripts/real_deploy.py --role cs --config config/cs.yaml
+    sudo python3 scripts/real_deploy.py --role cr --config config/cr1.yaml
+    sudo python3 scripts/real_deploy.py --role ap --config config/ap1.yaml
+    sudo python3 scripts/real_deploy.py --role ts --config config/ts.yaml
     sudo python3 scripts/real_deploy.py --role host --config config/host1.yaml
 
-配置文件格式见 config/*.yaml.example
+CR 部署前提:
+    sudo bash scripts/setup_vlan.sh setup   # 创建 VLAN 子接口
 """
 
 from __future__ import annotations
@@ -31,6 +33,8 @@ from src.nodes.control_server import ControlServer
 from src.nodes.access_point import AccessPoint
 from src.nodes.test_server import TestServer
 from src.nodes.host import Host
+from src.nodes.core_router import CoreRouter
+from src.routing.mapping import cr_add_remote_mapping
 
 ETH_P_ALL = 0x0003; MTU = 2048
 
@@ -59,6 +63,9 @@ class RealNIC:
 
 
 # ═══════════════════════════════════════════════════════════
+#  Builders
+# ═══════════════════════════════════════════════════════════
+
 def build_cs(cfg: dict) -> ControlServer:
     cs = ControlServer("CS")
     cs.rid = RID(*cfg["cs_rid"])
@@ -72,6 +79,77 @@ def build_cs(cfg: dict) -> ControlServer:
     for ap_rid, cr_rid in cfg.get("ap_to_cr", []):
         cs.db.ap_to_cr[RID(*ap_rid)] = RID(*cr_rid)
     return cs
+
+
+def build_cr(cfg: dict) -> CoreRouter:
+    """Build a CoreRouter from YAML config.
+
+    Configures all 9 tables per task spec §4.1.1:
+      Table 1: interfaces (from YAML)
+      Table 2: RID spaces
+      Table 3: route neighbors
+      Table 4: access neighbors
+      Table 5: RID routes
+      Table 6: AID routes
+      Table 7: local mappings
+      Table 8: remote mappings
+      Table 9: user statuses (initially empty)
+    """
+    cr = CoreRouter(cfg.get("name", "CR"))
+    cr.my_rid = RID(*cfg["rid"])
+
+    # Table 1: interfaces
+    for idx, iface in enumerate(cfg["interfaces"]):
+        if_type = InterfaceType.ROUTE if iface.get("type", "").upper() == "ROUTE" else InterfaceType.ACCESS
+        cr.add_interface(iface["name"], iface["mac"])
+        cr.configure_interface(idx, iface["name"], iface["mac"], if_type)
+
+    # Table 2: RID spaces
+    for rs in cfg.get("rid_spaces", []):
+        policy = SpacePolicy.MANAGEMENT
+        if rs.get("policy", "").upper() == "DEFAULT":
+            policy = SpacePolicy.DEFAULT
+        elif rs.get("policy", "").upper() == "ADVANCED":
+            policy = SpacePolicy.ADVANCED
+        cr.add_rid_space(rs["id"], RIDSpace(rs["x"], rs["y"], rs["x_mask"], rs["y_mask"]), policy)
+
+    # Table 3: route neighbors (management plane space-0 → CS, data plane space-100 → other CRs)
+    for nb in cfg.get("route_neighbors", []):
+        cr.add_route_neighbor(nb["space_id"], RID(*nb["rid"]), nb["mac"], nb["interface"])
+
+    # Table 4: access neighbors
+    for nb in cfg.get("access_neighbors", []):
+        cr.add_access_neighbor(AID.from_hex(nb["aid"]), nb["mac"], nb["interface"])
+
+    # Table 5: RID routes
+    for rt in cfg.get("rid_routes", []):
+        cr.add_rid_route(rt["space_id"], rt["x"], rt["y"],
+                         rt["x_mask"], rt["y_mask"], RID(*rt["next_hop"]))
+
+    # Table 6: AID routes
+    for rt in cfg.get("aid_routes", []):
+        cr.add_aid_route(AID.from_hex(rt["dst_aid"]), AID.from_hex(rt["next_hop"]))
+
+    # Table 7: local mappings
+    for m in cfg.get("local_mappings", []):
+        cr.add_local_mapping(AID.from_hex(m["aid"]), RID(*m["rid"]), m.get("space_id", 0))
+
+    # Table 8: remote mappings
+    for m in cfg.get("remote_mappings", []):
+        cr_add_remote_mapping(cr.tables, AID.from_hex(m["aid"]),
+                              RID(*m["mapped_rid"]), RID(*m["remote_cr"]),
+                              m.get("space_id", 100))
+
+    # Associated AP list
+    for ap in cfg.get("associated_aps", []):
+        cr.add_associated_ap(AID.from_hex(ap["aid"]), RID(*ap["rid"]), ap["interface"])
+
+    # Table 9: user statuses — initial为空, CS 动态更新
+    for u in cfg.get("users", []):
+        cr.set_user_status(AID.from_hex(u["aid"]), AID.from_hex(u["ap_aid"]),
+                           UserStatus.ONLINE, u.get("attributes", ""))
+
+    return cr
 
 
 def build_ap(cfg: dict) -> AccessPoint:
@@ -105,10 +183,13 @@ def build_host(cfg: dict) -> Host:
     return h
 
 
-BUILDERS = {"cs": build_cs, "ap": build_ap, "ts": build_ts, "host": build_host}
+BUILDERS = {"cs": build_cs, "cr": build_cr, "ap": build_ap, "ts": build_ts, "host": build_host}
 
 
 # ═══════════════════════════════════════════════════════════
+#  Runtime
+# ═══════════════════════════════════════════════════════════
+
 async def run_device(role: str, cfg: dict) -> None:
     setup_logging(level="INFO")
 
@@ -157,6 +238,16 @@ async def run_device(role: str, cfg: dict) -> None:
         asyncio.create_task(_ts_ready(node))
     elif role == "host":
         asyncio.create_task(_host_scenario(node, cfg.get("target_aid", "")))
+    elif role == "cr":
+        logger.info(f"[cr] {cfg.get('name', 'CR')} tables: "
+                    f"spaces={len(node.tables.rid_spaces)}, "
+                    f"rid_routes={len(node.tables.rid_routes)}, "
+                    f"aid_routes={len(node.tables.aid_routes)}, "
+                    f"local_mappings={len(node.tables.local_mappings)}, "
+                    f"remote_mappings={len(node.tables.remote_mappings)}, "
+                    f"access_neighbors={len(node.tables.access_neighbors)}, "
+                    f"route_neighbors={len(node.tables.route_neighbors)}, "
+                    f"users={len(node.tables.user_statuses)} (initial)")
 
     logger.info(f"[{role}] running on {[n.name for n in nics]}")
 
@@ -175,7 +266,15 @@ async def run_device(role: str, cfg: dict) -> None:
         for nic in nics:
             try: loop.remove_reader(nic.fileno())
             except: pass; nic.close()
-        logger.info(f"[{role}] stopped")
+        # Print summary for CR
+        if role == "cr":
+            m = node.metrics.summary()
+            tx = sum(n.tx for n in nics); rx = sum(n.rx for n in nics)
+            logger.info(f"[cr] stopped nic_tx={tx} nic_rx={rx} "
+                        f"s={m['sent_packets']} r={m['recv_packets']} "
+                        f"users={len(node.tables.user_statuses)} (final)")
+        else:
+            logger.info(f"[{role}] stopped")
 
 
 async def _ts_ready(ts: TestServer) -> None:
@@ -183,14 +282,11 @@ async def _ts_ready(ts: TestServer) -> None:
     await ts.start_http_server(page_size=4096, num_pages=5)
     await ts.start_ftp_server(file_count=3, file_size=100_000)
     await ts.start_video_server(chunk_count=10, chunk_size=50_000)
-    # Start live monitor (periodic stats)
     await ts.start_monitor(interval_s=3.0)
     logger.info("[ts] HTTP/FTP/Video servers + monitor ready")
 
-    # Optional: run RID forwarding test if target RIDs configured
     if ts.rid:
         from src.common.addressing import RID
-        # Default: probe CR-1 and CR-2
         target_rids = [RID(10001, 36191), RID(12360, 34280)]
         asyncio.create_task(ts.run_rid_forwarding_test(target_rids, probes_per_target=3))
 
@@ -210,11 +306,11 @@ async def _host_scenario(host: Host, target_aid_hex: str) -> None:
 # ═══════════════════════════════════════════════════════════
 def main() -> None:
     if os.geteuid() != 0:
-        print("需要 root 权限! sudo python3 scripts/real_deploy.py --role cs --config config/cs.yaml")
+        print("需要 root 权限! sudo python3 scripts/real_deploy.py --role cr --config config/cr1.yaml")
         sys.exit(1)
 
     parser = argparse.ArgumentParser(description="标识网络真机部署")
-    parser.add_argument("--role", required=True, choices=["cs", "ap", "ts", "host"])
+    parser.add_argument("--role", required=True, choices=["cs", "cr", "ap", "ts", "host"])
     parser.add_argument("--config", required=True, help="YAML 配置文件路径")
     args = parser.parse_args()
 
