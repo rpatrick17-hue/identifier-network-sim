@@ -157,8 +157,9 @@ def build_ap(cfg: dict) -> AccessPoint:
     ap.aid = AID.from_hex(cfg["aid"]); ap.rid = RID(*cfg["rid"])
     ap.cs_rid = RID(*cfg["cs_rid"]); ap.cr_rid = RID(*cfg["cr_rid"])
     ap.cs_mac = mac_from_str(cfg["cs_mac"]); ap.cr_mac = mac_from_str(cfg["cr_mac"])
-    ap.add_interface("access", cfg["interfaces"][0]["mac"])
-    ap._access_iface = 0; ap._cr_iface = 0
+    ap.add_interface("uplink", cfg["interfaces"][0]["mac"])   # NIC0 → CR
+    ap.add_interface("downlink", cfg["interfaces"][1]["mac"]) # NIC1 → Host
+    ap._access_iface = 1; ap._cr_iface = 0
     for u in cfg.get("local_users", []):
         ap._add_local_user(AID.from_hex(u["aid"]), u.get("ip", ""), u.get("mac", ""),
                            authenticated=True)
@@ -174,12 +175,16 @@ def build_ts(cfg: dict) -> TestServer:
 
 def build_host(cfg: dict) -> Host:
     h = Host("Host")
-    h.aid = AID.from_hex(cfg["aid"])
     h.ip_address = cfg.get("ip", "192.168.1.100")
     h.username = cfg["username"]; h.password = cfg["password"]
     h.add_interface("access", cfg["interfaces"][0]["mac"])
     h._iface_idx = 0; h._ap_mac = cfg.get("ap_mac", "")
-    h.load_aid_config(cfg["aid"], h.username, h.password)
+    # Auto-generate AID from credentials (same formula as CS)
+    from src.common.utils import generate_aid
+    pin = cfg.get("pin", "0000")
+    aid_hex = generate_aid(h.username, pin, "").hex()
+    h.aid = AID.from_hex(aid_hex)
+    h.load_aid_config(aid_hex, h.username, h.password)
     return h
 
 
@@ -216,7 +221,11 @@ async def run_device(role: str, cfg: dict) -> None:
     loop = asyncio.get_running_loop()
     my_macs = set()
     for iface in node.interfaces:
-        my_macs.add(iface.mac.hex())
+        # iface.mac may be bytes or str depending on how interface was added
+        if isinstance(iface.mac, bytes):
+            my_macs.add(iface.mac.hex())         # bytes → hex string
+        else:
+            my_macs.add(iface.mac.replace(":", "").lower())  # str → strip colons
         my_macs.add("ffffffffffff")  # always accept broadcast
 
     for idx, nic in enumerate(nics):

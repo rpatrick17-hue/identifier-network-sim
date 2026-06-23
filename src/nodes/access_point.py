@@ -148,7 +148,7 @@ class AccessPoint(BaseNode):
             data_type=DataType.CONTROL_SIGNALING,
             ttl=DEFAULT_TTL,
         )
-        await self.send_rid_packet(self._cr_iface, rid_pkt, self.cs_mac)
+        await self.send_rid_packet(self._cr_iface, rid_pkt, self.cr_mac)
 
         # Wait for CS response (with timeout)
         try:
@@ -215,7 +215,7 @@ class AccessPoint(BaseNode):
             payload=data, network_space_id=0,
             data_type=DataType.CONTROL_SIGNALING, ttl=DEFAULT_TTL,
         )
-        await self.send_rid_packet(self._cr_iface, rid_pkt, self.cs_mac)
+        await self.send_rid_packet(self._cr_iface, rid_pkt, self.cr_mac)
 
     async def _notify_cr_mapping(self, user_aid: AID, mapped_rid: RID) -> None:
         """Send mapping update to the associated CR via RID control signal."""
@@ -242,7 +242,7 @@ class AccessPoint(BaseNode):
             payload=data, network_space_id=0,
             data_type=DataType.CONTROL_SIGNALING, ttl=DEFAULT_TTL,
         )
-        await self.send_rid_packet(self._cr_iface, rid_pkt, self.cs_mac)
+        await self.send_rid_packet(self._cr_iface, rid_pkt, self.cr_mac)
         self.logger.info(f"neighbour advertised: {msg.user_aid} via CS")
 
     async def activate_user(self, user_aid: AID, user_ip: str, user_mac: str,

@@ -232,6 +232,12 @@ class CoreRouter(BaseNode):
             self.logger.debug("RID TTL expired – dropped")
             return
 
+        # -- Branch 0: is it a local AP? (check before space match) --------
+        if self.tables.is_local_rid(rid_pkt.destination_rid):
+            # Deliver to AP — AP handles forwarding to Host
+            await self._deliver_to_local_ap(rid_pkt)
+            return
+
         # -- Branch 1: does dst RID match any local RID space? --------------
         if not self.tables.matching_rid_space(rid_pkt.destination_rid):
             # Not our space – continue core routing
@@ -272,10 +278,13 @@ class CoreRouter(BaseNode):
             if next_hop:
                 await self._forward_rid_to(next_hop, rid_pkt)
             else:
-                self.logger.debug(
-                    f"Control RID for {rid_pkt.destination_rid} in matching space – "
-                    f"not routed, may be L2 broadcast"
-                )
+                # No route entry → try direct neighbor lookup (one-hop)
+                forwarded = await self._forward_rid_direct(rid_pkt)
+                if not forwarded:
+                    self.logger.debug(
+                        f"Control RID for {rid_pkt.destination_rid} – "
+                        f"not routed, may be L2 broadcast"
+                    )
             return
 
         # -- Branch 4: space matches, not us, user data → decapsulate AID --
@@ -300,6 +309,21 @@ class CoreRouter(BaseNode):
             return
 
         await self.send_rid_packet(iface_idx, rid_pkt, dst_mac)
+
+    async def _forward_rid_direct(self, rid_pkt: RIDPacket) -> bool:
+        """Forward a RID packet by directly looking up the destination in
+        route_neighbors (bypassing the RID routing table).  Used for
+        control signalling where no explicit rid_route entry exists."""
+        for nb in self.tables.route_neighbors:
+            if nb.neighbor_rid == rid_pkt.destination_rid:
+                dst_mac = bytes(int(b, 16) for b in nb.neighbor_mac.split(":"))
+                await self.send_rid_packet(nb.interface_index, rid_pkt, dst_mac)
+                self.logger.debug(
+                    f"Control RID direct-forwarded to {nb.neighbor_rid} "
+                    f"via iface[{nb.interface_index}]"
+                )
+                return True
+        return False
 
     def _resolve_ap_mac(self, ap_aid: AID) -> bytes:
         """Look up an AP's MAC from the access neighbours table."""

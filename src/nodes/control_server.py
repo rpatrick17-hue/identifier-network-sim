@@ -120,12 +120,6 @@ class ControlServer(BaseNode):
                 user_aid=req.user_aid,
                 message="Invalid username or password",
             )
-        elif entry.user_aid != req.user_aid:
-            resp = AuthResponse(
-                success=False,
-                user_aid=req.user_aid,
-                message="AID mismatch",
-            )
         else:
             resp = AuthResponse(
                 success=True,

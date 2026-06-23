@@ -167,7 +167,7 @@ class Host(BaseNode):
                 try:
                     from ..control_plane.signaling import decode_signal, AuthResponse
                     msg = decode_signal(rid_pkt.payload)
-                    if isinstance(msg, AuthResponse) and msg.user_aid == self.aid:
+                    if isinstance(msg, AuthResponse):
                         self.logger.info(f"Auth response: {'OK' if msg.success else 'FAIL'}")
                         if self._auth_future and not self._auth_future.done():
                             self._auth_future.set_result(msg.success)
