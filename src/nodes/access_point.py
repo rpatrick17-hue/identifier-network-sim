@@ -162,9 +162,8 @@ class AccessPoint(BaseNode):
         self, user_aid: AID, custom_attributes: dict | str
     ) -> None:
         """After successful auth: allocate mapping, notify CR, register CS, notify neighbours."""
-        # Allocate a mapping for the user
-        # (simplified: use a deterministic mapping based on user AID)
-        mapped_rid = RID(user_aid.value >> 64 & 0xFFFFFFFF, user_aid.value & 0xFFFFFFFF)
+        # Map user to this AP's RID (same as associated CR's RID)
+        mapped_rid = self.cr_rid or RID(user_aid.value >> 64 & 0xFFFFFFFF, user_aid.value & 0xFFFFFFFF)
 
         # 1. Register mapping with CS
         reg = MappingRegisterRequest(
@@ -255,7 +254,7 @@ class AccessPoint(BaseNode):
         3. Advertise to neighbour APs for fast re-auth
         """
         self._add_local_user(user_aid, user_ip, user_mac, custom_attributes, authenticated=True)
-        mapped_rid = RID(user_aid.value >> 64 & 0xFFFFFFFF, user_aid.value & 0xFFFFFFFF)
+        mapped_rid = self.cr_rid or RID(user_aid.value >> 64 & 0xFFFFFFFF, user_aid.value & 0xFFFFFFFF)
 
         # 1. Register with CS (updates global mapping DB)
         reg = MappingRegisterRequest(
