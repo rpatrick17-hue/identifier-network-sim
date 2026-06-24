@@ -55,5 +55,7 @@ remote_mappings:
 associated_aps:
   - { aid: "8d969eef6ecad3c29a3a629280e686cf", rid: [10001, 36191], interface: 2 }
 
-# 用户状态列表 (Table 9) — 初始为空, 用户上线后由 CS 动态更新
-users: []
+# 用户状态列表 (Table 9)
+users:
+  - { aid: "d3c29a3a629280e686cf8d969eef6eca", ap_aid: "8d969eef6ecad3c29a3a629280e686cf", status: ONLINE }  # TS
+  - { aid: "cad3c29a3a629280e686cf8d969eef6e", ap_aid: "8d969eef6ecad3c29a3a629280e686cf", status: ONLINE }  # Host-1
