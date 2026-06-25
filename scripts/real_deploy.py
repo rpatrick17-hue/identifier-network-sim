@@ -308,8 +308,7 @@ async def _host_scenario(host: Host, target_aid_hex: str) -> None:
         for i in range(5):
             await host.http_get(f"/page_{i}.html", target)
             await asyncio.sleep(1)
-        logger.info("[host] scenario done")
-        host._running = False
+        logger.info("[host] scenario done — staying alive")
 
 
 # ═══════════════════════════════════════════════════════════

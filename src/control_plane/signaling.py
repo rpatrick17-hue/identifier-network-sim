@@ -323,11 +323,16 @@ class RouteConfigPush:
 
 @dataclass
 class MappingUpdateNotification:
-    """CS → CR: a user's mapping has changed due to mobility."""
+    """CS → CR: a user's mapping has changed due to mobility.
+
+    ap_rid identifies which AP the user is connected to,
+    so the receiving CR can find the right AP interface for delivery.
+    """
 
     aid: AID
     new_mapped_rid: RID
     new_cr_rid: RID
+    ap_rid: RID = field(default_factory=lambda: RID(0, 0))
 
     def to_dict(self) -> dict:
         return {
@@ -335,6 +340,7 @@ class MappingUpdateNotification:
             "aid": self.aid.to_hex(),
             "new_mapped_rid": self.new_mapped_rid.to_tuple(),
             "new_cr_rid": self.new_cr_rid.to_tuple(),
+            "ap_rid": self.ap_rid.to_tuple(),
         }
 
     @classmethod
@@ -343,11 +349,7 @@ class MappingUpdateNotification:
             aid=AID.from_hex(d["aid"]),
             new_mapped_rid=RID.from_tuple(tuple(d["new_mapped_rid"])),
             new_cr_rid=RID.from_tuple(tuple(d["new_cr_rid"])),
-        )
-        return cls(
-            space_id=d["space_id"],
-            dest_rid_space=tuple(d["dest_rid_space"]),
-            next_hop_rid=RID.from_tuple(tuple(d["next_hop_rid"])),
+            ap_rid=RID.from_tuple(tuple(d.get("ap_rid", (0, 0)))),
         )
 
 

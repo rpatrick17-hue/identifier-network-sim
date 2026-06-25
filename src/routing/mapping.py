@@ -46,7 +46,7 @@ def cr_add_local_mapping(
 
 
 def cr_add_remote_mapping(
-    tables: CRTables, aid: AID, mapped_rid: RID, remote_cr_rid: RID, space_id: int = 0
+    tables: CRTables, aid: AID, mapped_rid: RID, remote_cr_rid: RID, space_id: int = 100
 ) -> None:
     tables.remote_mappings[aid] = MappingEntry(
         aid=aid, mapped_rid=mapped_rid, remote_cr_rid=remote_cr_rid, space_id=space_id

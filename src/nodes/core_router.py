@@ -238,6 +238,15 @@ class CoreRouter(BaseNode):
             await self._deliver_to_local_ap(rid_pkt)
             return
 
+        # -- Branch 0.5: is it addressed to ME? (check before space match) ---
+        if self._my_rid and rid_pkt.destination_rid == self._my_rid:
+            if rid_pkt.data_type == DataType.CONTROL_SIGNALING:
+                await self._handle_control_signal(rid_pkt)
+            else:
+                # User data addressed to this CR — decapsulate inner AID
+                await self._decapsulate_and_forward(rid_pkt)
+            return
+
         # -- Branch 1: does dst RID match any local RID space? --------------
         if not self.tables.matching_rid_space(rid_pkt.destination_rid):
             # Not our space – continue core routing
@@ -413,21 +422,20 @@ class CoreRouter(BaseNode):
         if isinstance(msg, MappingUpdateNotification):
             from ..routing.mapping import cr_update_mapping
             cr_update_mapping(self.tables, msg.aid, msg.new_mapped_rid, msg.new_cr_rid)
-            if msg.aid in self.tables.user_statuses:
-                self.tables.user_statuses[msg.aid].status = UserStatus.MOVED_AWAY
-            else:
-                # 新用户注册到本CR下的AP (CS传播)
+            # Only set ONLINE if this CR is the one serving the user
+            if msg.new_cr_rid == self._my_rid:
                 from ..tables.cr_tables import UserStatusEntry
                 self.tables.user_statuses[msg.aid] = UserStatusEntry(
-                    user_aid=msg.aid, ap_aid=AID(0),  # AP_AID will be set by AP
+                    user_aid=msg.aid, ap_aid=AID(0),
                     status=UserStatus.ONLINE,
                 )
-            # Set AP_AID from managed APs
-            for ap_aid, ap_entry in self.tables.associated_aps.items():
-                if ap_entry.ap_rid == msg.new_mapped_rid:
-                    self.tables.user_statuses[msg.aid].ap_aid = ap_aid
-                    break
-            self.logger.info(f"mapping updated from CS: {msg.aid} → {msg.new_mapped_rid}")
+                # Match AP by ap_rid from the notification
+                for ap_aid, ap_entry in self.tables.associated_aps.items():
+                    if ap_entry.ap_rid == msg.ap_rid:
+                        self.tables.user_statuses[msg.aid].ap_aid = ap_aid
+                        self.logger.info(f"user {msg.aid} mapped to AP {ap_aid}")
+                        break
+                self.logger.info(f"mapping updated from CS: {msg.aid} → {msg.new_mapped_rid}")
 
     async def _send_control_to_cs(self, msg) -> None:
         """Send a control message to the Control Server."""

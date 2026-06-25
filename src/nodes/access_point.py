@@ -340,10 +340,11 @@ class AccessPoint(BaseNode):
         if user is None:
             self.logger.warning(f"AID for unknown user {dst_aid}")
             return
-        # In simulation we just log; in a real system we'd send the
-        # inner IP packet to the user's network stack.
         self.metrics.record_recv(len(aid_pkt.payload))
-        self.logger.debug(f"delivered {len(aid_pkt.payload)}B to user {dst_aid}")
+        # Send AID frame to Host via downlink interface
+        dst_mac = bytes.fromhex(user.mac_address.replace(":", "")) if user.mac_address else b"\xff" * 6
+        await self.send_aid_packet(self._access_iface, aid_pkt, dst_mac)
+        self.logger.info(f"delivered {len(aid_pkt.payload)}B to user {dst_aid}")
 
     # ==================================================================
     #  Lifecycle

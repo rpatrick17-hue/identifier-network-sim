@@ -143,7 +143,7 @@ class ControlServer(BaseNode):
         # 通知所有管理的CR: 新用户已注册 (全局传播)
         update = MappingUpdateNotification(
             aid=msg.aid, new_mapped_rid=msg.mapped_rid,
-            new_cr_rid=cr_rid,
+            new_cr_rid=cr_rid, ap_rid=msg.ap_rid,
         )
         for crid in list(self.db.managed_crs.keys()):
             await self._reply_to(crid, update)
